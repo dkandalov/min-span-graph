@@ -31,19 +31,22 @@
     <script src="min-span-graph.js"></script>
 </head>
 <body>
-    <br/>
-    <label>Graph: </label>
-    <input type="text" value="[a-b/1, b-c/2, a-c/5]" id="graph-input"/>
-    <input type="button" value="Build" id="build-graph"/>
-    <input type="button" value="Build random" id="build-random-graph"/>
-    <br/><br/>
-    <label>Min span tree: </label>
-    <input type="button" value="Highlight next edge" id="step"/>
-    <br/><br/>
-    <label>Show edge weight:</label>
-    <input type="checkbox" id="toggle-edge-weight"/>
-    <br/>
-    <svg width="960" height="600"></svg>
+<br/>
+<label for="graph-input">Graph: </label>
+<input type="text" value="[a-b/1, b-c/2, a-c/5]" id="graph-input"/>
+<input type="button" value="Build" id="build-graph"/>
+<input type="button" value="Build random" id="build-random-graph"/>
+<br/><br/>
+<label for="next-edge">Min span tree: </label>
+<input type="button" value="Highlight next edge" id="next-edge"/>
+<br/><br/>
+<label for="toggle-edge-weight">Show edge weight:</label>
+<input type="checkbox" id="toggle-edge-weight"/>
+<br/>
+<label for="graph-zoom">Zoom:</label>
+<input type="range" id="graph-zoom" min="0" max="100" value="50"/>
+<br/>
+<svg width="960" height="600"></svg>
 </body>
 
 <script>
@@ -52,24 +55,32 @@
     var node;
     var simulation;
     var graph;
+    var forceManyBody;
+    var forceStrength = 0.7;
     var edgeWeightOpacity = 0;
 
     d3.select("#build-graph").on('click', function() {
         showGraph(document.getElementById("graph-input").value);
     });
-    d3.select("#build-random-graph").on('click', function() {
+    d3.select("#build-random-graph").on("click", function() {
         var randomGraphString = randomGraph();
         document.getElementById("graph-input").value = randomGraphString;
         showGraph(randomGraphString);
     });
-    d3.select("#step").on('click', function() {
+    d3.select("#next-edge").on("click", function() {
         if (events.length === 0) return;
         showEvent(events.pop());
     });
-    d3.select("#toggle-edge-weight").on('click', function() {
+    d3.select("#toggle-edge-weight").on("click", function() {
         if (link === undefined) return;
         edgeWeightOpacity = edgeWeightOpacity == 0 ? 0.6 : 0;
         link.selectAll("text").attr("opacity", edgeWeightOpacity);
+    });
+    d3.select("#graph-zoom").on("change", function() {
+        if (simulation === undefined) return;
+        forceStrength = +this.value;
+        updatedForceManyBodyStrength();
+        simulation.alpha(1).tick();
     });
 
     showGraph(document.getElementById("graph-input").value);
@@ -97,10 +108,10 @@
 
         link.append("line").attr("stroke-width", function(d) { return Math.sqrt(d.value); });
         link.append("text")
-             .attr("x", 10)
-             .attr("dy", ".5em")
-             .attr("opacity", edgeWeightOpacity)
-             .text(function(d) { return d.label; });
+                .attr("x", 10)
+                .attr("dy", ".5em")
+                .attr("opacity", edgeWeightOpacity)
+                .text(function(d) { return d.label; });
 
 
         node = svg.append("g")
@@ -118,13 +129,20 @@
                 .text(function(d) { return d.id; });
 
 
+        forceManyBody = d3.forceManyBody();
         simulation = d3.forceSimulation()
                 .force("link", d3.forceLink().id(function(d) { return d.id; }))
-                .force("charge", d3.forceManyBody().strength(-530))
+                .force("charge", updatedForceManyBodyStrength())
                 .force("center", d3.forceCenter(width / 2, height / 2));
 
         simulation.nodes(graph.nodes).on("tick", ticked);
         simulation.force("link").links(graph.links);
+    }
+
+    function updatedForceManyBodyStrength() {
+        if (forceManyBody === undefined) return;
+        forceManyBody.strength(function(){ return -30 - (forceStrength * 20); });
+        return forceManyBody;
     }
 
     function showEvent(event) {
@@ -134,21 +152,21 @@
             }
         });
         link.data(graph.links).select("line")
-            .attr("stroke-width", function(d) { return d.value; });
+                .attr("stroke-width", function(d) { return d.value; });
     }
 
     function ticked() {
         link.select("line")
-            .attr("x1", function(d) { return d.source.x; })
-            .attr("y1", function(d) { return d.source.y; })
-            .attr("x2", function(d) { return d.target.x; })
-            .attr("y2", function(d) { return d.target.y; });
+                .attr("x1", function(d) { return d.source.x; })
+                .attr("y1", function(d) { return d.source.y; })
+                .attr("x2", function(d) { return d.target.x; })
+                .attr("y2", function(d) { return d.target.y; });
         link.select("text")
-            .attr("transform", function(d) {
-                var x = (d.source.x + d.target.x) / 2 - 10;
-                var y = (d.source.y + d.target.y) / 2 - 10;
-                return "translate(" + x + "," + y + ")";
-            });
+                .attr("transform", function(d) {
+                    var x = (d.source.x + d.target.x) / 2 - 10;
+                    var y = (d.source.y + d.target.y) / 2 - 10;
+                    return "translate(" + x + "," + y + ")";
+                });
 
         node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
     }
